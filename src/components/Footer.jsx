@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="border-t border-black/5">
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between lg:px-10">
         <p>
-          <span className="font-semibold text-slate-600">Aura Sanctuary</span>{' '}
+          <span className="font-semibold text-slate-600">Mindful Wellbeing</span>{' '}
           <span className="mx-1 text-slate-300">•</span> Mindful presence through contemplative
           design.
         </p>
@@ -13,7 +13,7 @@ export default function Footer() {
             Private Session Active
           </span>
           <span className="text-slate-300">•</span>
-          <span>© 2025 Sanctuary Labs</span>
+          <span>© 2025 Mindful Wellbeing</span>
         </p>
       </div>
     </footer>

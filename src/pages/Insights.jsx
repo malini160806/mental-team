@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import {
   Download,
   Share2,
@@ -10,10 +10,13 @@ import {
   AlertTriangle,
   FileText,
   RotateCw,
-  ShieldCheck,
+  Moon,
+  Sparkles,
 } from 'lucide-react';
 import { questions, sections } from '../data/questions';
 import { SECTION_ICON, SECTION_INSIGHT } from '../data/insightContent';
+import SectionTag from '../components/SectionTag';
+import { RESULT_KEY } from './Reflect';
 
 const MICRO_STEPS = [
   {
@@ -42,26 +45,78 @@ const MICRO_STEPS = [
   },
 ];
 
-function statusFor(score) {
-  if (score >= 70) return 'Harmonious';
-  if (score >= 50) return 'Balanced';
-  if (score >= 30) return 'Strained';
-  return 'Overwhelmed';
+const LEVEL_STYLE = {
+  Low: {
+    ring: '#10b981',
+    text: 'text-emerald-600',
+    pill: 'bg-emerald-50 text-emerald-700',
+    note: 'Reported pressure is light across most areas right now.',
+  },
+  Moderate: {
+    ring: '#f59e0b',
+    text: 'text-amber-600',
+    pill: 'bg-amber-50 text-amber-700',
+    note: 'Some areas are carrying noticeable pressure worth keeping an eye on.',
+  },
+  High: {
+    ring: '#e11d48',
+    text: 'text-rose-600',
+    pill: 'bg-rose-50 text-rose-700',
+    note: 'Several areas are under strain — a good moment to lighten the load where you can.',
+  },
+};
+
+function barColor(percent) {
+  if (percent <= 33) return 'bg-emerald-500';
+  if (percent <= 66) return 'bg-amber-400';
+  return 'bg-rose-500';
 }
 
+// Shown when the page is opened directly, without completing the check-in.
+function loadResult() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(RESULT_KEY));
+    return parsed?.assessment ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Insights only opens once the Reflect check-in has been completed.
 export default function Insights() {
   const { state } = useLocation();
-  const answers = state?.answers ?? null;
-  const score = state?.score ?? 72;
-  const status = statusFor(score);
+  const result = state?.assessment ? state : loadResult();
+  if (!result) return <Navigate to="/reflect" replace />;
+  return <InsightsView answers={result.answers ?? null} assessment={result.assessment} />;
+}
+
+function InsightsView({ answers, assessment }) {
+  const score = Math.round(assessment.stressScore);
+  const level = assessment.stressLevel;
+  const levelStyle = LEVEL_STYLE[level];
+
+  const [animatedScore, setAnimatedScore] = useState(0);
+
+  useEffect(() => {
+    setAnimatedScore(0);
+    const duration = 1100;
+    const start = performance.now();
+    let frame;
+
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setAnimatedScore(Math.round(eased * score));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [score]);
 
   const derived = useMemo(() => {
     if (!answers) {
       return {
-        stressPercent: 28,
-        stressLabel: 'Moderate',
-        somatic: 88,
-        clarity: 64,
         themes: [
           { key: 'focus', tier: 'attention' },
           { key: 'sleep', tier: 'strength' },
@@ -81,23 +136,6 @@ export default function Insights() {
       bySection[q.section].count += 1;
     });
 
-    const avgOf = (keys) => {
-      let total = 0;
-      let count = 0;
-      keys.forEach((k) => {
-        total += bySection[k].total;
-        count += bySection[k].count;
-      });
-      return count ? total / count : 0;
-    };
-
-    const stressAvg = avgOf(Object.keys(sections));
-    const stressPercent = Math.round((stressAvg / 3) * 100);
-    const stressLabel = stressPercent <= 33 ? 'Low' : stressPercent <= 66 ? 'Moderate' : 'Elevated';
-
-    const somatic = Math.round(100 - (avgOf(['body', 'sleep']) / 3) * 100);
-    const clarity = Math.round(100 - (avgOf(['focus', 'mind']) / 3) * 100);
-
     const ranked = Object.entries(bySection)
       .filter(([, v]) => v.count > 0)
       .map(([key, v]) => ({ key, avg: v.total / v.count }))
@@ -116,138 +154,138 @@ export default function Insights() {
       themes.push({ key: 'sleep', tier: 'strength' });
     }
 
-    return { stressPercent, stressLabel, somatic, clarity, themes };
+    return { themes };
   }, [answers]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 lg:px-10">
+    <div className="relative mx-auto max-w-6xl overflow-hidden px-6 pb-24 pt-12 lg:px-10">
+      {/* Decorative ambient blobs */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-24 -top-16 h-72 w-72 animate-float-slow rounded-full bg-teal-200/30 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 top-24 h-80 w-80 animate-float-slower rounded-full bg-indigo-200/30 blur-3xl"
+      />
+
       {/* Header */}
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="flex items-center gap-2 text-[11px] font-bold tracking-wide text-emerald-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            REFLECTION COMPLETED <span className="text-slate-300">•</span> PERSONAL PORTRAIT
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="animate-fade-up">
+          <SectionTag icon={Sparkles}>WELLBEING SUMMARY</SectionTag>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Your Wellbeing Discovery
           </h1>
           <p className="mt-2 max-w-lg text-sm text-slate-500">
             A mindful snapshot synthesized from your contemplative check-in today.
           </p>
         </div>
-        <div className="flex shrink-0 gap-3">
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        <div className="flex shrink-0 flex-wrap gap-3">
+          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
             <Download size={15} /> Export Report
           </button>
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
             <Share2 size={15} /> Share
           </button>
         </div>
       </div>
 
       {/* Score card */}
-      <div className="mt-8 grid gap-8 rounded-[28px] border border-slate-100 bg-white/90 p-8 shadow-card lg:grid-cols-[280px_1fr]">
+      <div className="animate-fade-up relative mt-8 grid gap-8 rounded-[28px] border border-slate-100 bg-white/90 p-6 shadow-card sm:p-8 lg:grid-cols-[280px_1fr]" style={{ animationDelay: '80ms' }}>
         <div className="flex flex-col items-center justify-center gap-3 border-b border-slate-100 pb-8 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
-          <div
-            className="relative grid h-44 w-44 place-items-center rounded-full"
-            style={{
-              background: `conic-gradient(#4f46e5 ${score * 3.6}deg, #e2e8f0 0deg)`,
-            }}
-          >
-            <div className="grid h-36 w-36 place-items-center rounded-full bg-white text-center">
-              <div>
-                <p className="text-[10px] font-semibold tracking-wide text-slate-400">
-                  SYNTHESIZED INDEX
-                </p>
-                <p className="text-4xl font-extrabold text-slate-900">
-                  {score}
-                  <span className="text-lg font-semibold text-slate-400">/100</span>
-                </p>
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-                  {status}
-                </span>
+          <div className="relative grid h-44 w-44 place-items-center">
+            <div className="animate-pulse-ring absolute inset-0 rounded-full bg-indigo-400/20" />
+            <div
+              className="animate-pop-in relative grid h-44 w-44 place-items-center rounded-full transition-[background]"
+              style={{
+                background: `conic-gradient(${levelStyle.ring} ${animatedScore * 3.6}deg, #e2e8f0 0deg)`,
+              }}
+            >
+              <div className="grid h-36 w-36 place-items-center rounded-full bg-white text-center">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-wide text-slate-400">STRESS SCORE</p>
+                  <p className="text-4xl font-extrabold text-slate-900">
+                    {animatedScore}
+                    <span className="text-lg font-semibold text-slate-400">/100</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${levelStyle.pill}`}>
+            Stress Level: {level}
+          </span>
           <p className="max-w-[220px] text-center text-xs leading-relaxed text-slate-400">
-            A balanced equilibrium between energetic processing and physical recuperation.
+            {levelStyle.note}
           </p>
         </div>
 
         <div>
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold tracking-wide text-slate-400">
-              ACTIVE INDICATOR
-            </p>
-            <p className="text-[11px] font-medium text-slate-400">Evaluated Today</p>
-          </div>
+          <SectionTag>SNAPSHOT</SectionTag>
           <p className="mt-1 text-lg font-bold text-slate-900">
-            Wellbeing Balance: <span className="text-indigo-600">{status}</span>
+            Stress Level: <span className={levelStyle.text}>{level}</span>
           </p>
-          <p className="mt-1 text-sm text-slate-500">
-            Your physiological inputs reflect elevated mental activation accompanied by grounded
-            somatic stability.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{assessment.explanation}</p>
 
           <div className="mt-5 rounded-2xl bg-slate-50/80 p-5">
             <div className="flex items-center justify-between text-sm">
               <p className="font-medium text-slate-600">Stress Level Spectrum</p>
-              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-indigo-600 shadow-sm">
-                Current: {derived.stressLabel}
+              <span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold shadow-sm ${levelStyle.text}`}>
+                Current: {level}
               </span>
             </div>
-            <div className="relative mt-4 h-2 w-full rounded-full bg-gradient-to-r from-teal-400 via-indigo-400 to-violet-400">
+            <div className="relative mt-4 h-2 w-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500">
               <div
-                className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-4 border-indigo-600 bg-white shadow"
-                style={{ left: `${Math.min(96, Math.max(2, derived.stressPercent))}%` }}
+                className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-slate-700 bg-white shadow"
+                style={{ left: `${Math.min(98, Math.max(2, score))}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-[11px] font-medium text-slate-400">
               <span className="text-left">
                 Low
-                <br />
-                Grounded
+                <br />0–33
               </span>
               <span className="text-center">
                 Moderate
                 <br />
-                Responsive
+                34–66
               </span>
               <span className="text-right">
-                Elevated
+                High
                 <br />
-                Overloaded
+                67–100
               </span>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-slate-50/80 p-4">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                <ShieldCheck size={16} />
-              </div>
-              <div>
-                <p className="text-lg font-bold text-slate-900">{derived.somatic}%</p>
-                <p className="text-xs text-slate-400">Somatic Grounding</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl bg-slate-50/80 p-4">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
-                <Sun size={16} />
-              </div>
-              <div>
-                <p className="text-lg font-bold text-slate-900">{derived.clarity}%</p>
-                <p className="text-xs text-slate-400">Clarity Index</p>
-              </div>
-            </div>
+          <div className="mt-5">
+            <p className="text-sm font-medium text-slate-600">Behavioural Breakdown</p>
+            <p className="text-xs text-slate-400">Reported pressure in each area — higher means more strain.</p>
+            <ul className="mt-3 space-y-3">
+              {[...assessment.categories]
+                .sort((a, b) => b.percent - a.percent)
+                .map((c) => (
+                  <li key={c.key}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-600">{c.label}</span>
+                      <span className="font-semibold tabular-nums text-slate-700">{c.percent}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-700 ${barColor(c.percent)}`}
+                        style={{ width: `${c.percent}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+            </ul>
           </div>
         </div>
       </div>
 
       {/* Thematic Reflections */}
-      <div className="mt-16">
-        <p className="text-[11px] font-bold tracking-wide text-indigo-500">PERSONALIZED PILLARS</p>
+      <div className="relative mt-16">
+        <SectionTag>PERSONALIZED PILLARS</SectionTag>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">
           Thematic Reflections
         </h2>
@@ -255,8 +293,8 @@ export default function Insights() {
           Derived from your introspective patterns and cadence responses.
         </p>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-3">
-          {derived.themes.map(({ key, tier }) => {
+        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {derived.themes.map(({ key, tier }, i) => {
             const Icon = SECTION_ICON[key];
             const content = SECTION_INSIGHT[key][tier];
             const badgeStyle =
@@ -264,9 +302,13 @@ export default function Insights() {
                 ? 'bg-amber-50 text-amber-600'
                 : 'bg-emerald-50 text-emerald-600';
             return (
-              <div key={key} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
+              <div
+                key={key}
+                className="animate-fade-up group rounded-3xl border border-slate-100 bg-white p-6 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
+                style={{ animationDelay: `${120 + i * 90}ms` }}
+              >
                 <div className="flex items-center justify-between">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-110">
                     <Icon size={18} />
                   </div>
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${badgeStyle}`}>
@@ -288,12 +330,14 @@ export default function Insights() {
       </div>
 
       {/* Micro steps */}
-      <div className="mt-16 rounded-[28px] bg-indigo-50/40 p-8">
-        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+      <div className="animate-fade-up relative mt-16 overflow-hidden rounded-[28px] bg-indigo-50/40 p-8" style={{ animationDelay: '160ms' }}>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 animate-float-slow rounded-full bg-white/50 blur-2xl"
+        />
+        <div className="relative flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
           <div>
-            <p className="text-[11px] font-bold tracking-wide text-indigo-500">
-              LOW-PRESSURE INVITATIONS
-            </p>
+            <SectionTag>LOW-PRESSURE INVITATIONS</SectionTag>
             <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">
               One Small Thing You Can Try
             </h2>
@@ -306,9 +350,13 @@ export default function Insights() {
           </p>
         </div>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-3">
-          {MICRO_STEPS.map((step) => (
-            <div key={step.title} className="flex flex-col rounded-3xl bg-white p-5 shadow-card">
+        <div className="relative mt-6 grid gap-5 sm:grid-cols-3">
+          {MICRO_STEPS.map((step, i) => (
+            <div
+              key={step.title}
+              className="animate-fade-up flex flex-col rounded-3xl bg-white p-5 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
+              style={{ animationDelay: `${220 + i * 90}ms` }}
+            >
               <div className={`grid h-10 w-10 place-items-center rounded-xl ${step.color}`}>
                 <step.icon size={18} />
               </div>
@@ -325,9 +373,18 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* Atmosphere + practice note */}
       <div className="mt-16 grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <div className="relative flex min-h-[240px] items-end overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_25%_20%,#5a4632,transparent_60%),radial-gradient(circle_at_85%_0%,#3a4a3f,transparent_55%),linear-gradient(160deg,#2a241d,#14110d)] p-7 shadow-card">
+        <div className="animate-fade-up relative flex min-h-[240px] items-end overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_25%_20%,#5a4632,transparent_60%),radial-gradient(circle_at_85%_0%,#3a4a3f,transparent_55%),linear-gradient(160deg,#2a241d,#14110d)] p-7 shadow-card">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-6 top-6 grid h-24 w-24 animate-float-slower place-items-center rounded-full bg-white/10 backdrop-blur-sm"
+          >
+            <Moon size={32} className="text-white/70" />
+          </div>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -left-8 bottom-10 h-16 w-16 animate-float-slow rounded-full bg-emerald-300/20 blur-xl"
+          />
           <div className="relative text-white">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
               Atmosphere
@@ -338,10 +395,8 @@ export default function Insights() {
           </div>
         </div>
 
-        <div className="flex flex-col justify-center rounded-[28px] border border-slate-100 bg-white p-8 shadow-card">
-          <p className="text-[11px] font-bold tracking-wide text-indigo-500">
-            CONTINUOUS REFLECTION
-          </p>
+        <div className="animate-fade-up flex flex-col justify-center rounded-[28px] border border-slate-100 bg-white p-8 shadow-card" style={{ animationDelay: '80ms' }}>
+          <SectionTag>CONTINUOUS REFLECTION</SectionTag>
           <h3 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900">
             Self-inquiry is a practice, not a destination.
           </h3>
@@ -357,8 +412,7 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* Gentle notice */}
-      <div className="mt-10 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+      <div className="animate-fade-up mt-10 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
         <div>
           <p className="text-sm font-semibold text-slate-700">Gentle Notice &amp; Context</p>
@@ -371,19 +425,18 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* Bottom actions */}
-      <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+      <div className="animate-fade-up mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" style={{ animationDelay: '80ms' }}>
+        <div className="flex flex-wrap gap-3">
+          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
             <FileText size={15} /> Save Reflection Summary (PDF)
           </button>
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
             <RotateCw size={15} /> Retake in 30 Days
           </button>
         </div>
         <Link
           to="/reflect"
-          className="flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-indigo-700"
+          className="flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-indigo-700"
         >
           Practice 2-min Box Breathing Now <ArrowRight size={16} />
         </Link>

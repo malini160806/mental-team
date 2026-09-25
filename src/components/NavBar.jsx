@@ -1,32 +1,37 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AudioLines } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { RESULT_KEY } from '../pages/Reflect';
 
 const NAV_LINKS = [
-  { to: '/', label: 'Sanctuary' },
+  { to: '/', label: 'Home' },
   { to: '/reflect', label: 'Reflect' },
-  { to: '/breathe', label: 'Breathe' },
   { to: '/insights', label: 'Insights' },
 ];
 
+function hasReflectResult() {
+  try {
+    return sessionStorage.getItem(RESULT_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export default function NavBar() {
   const { pathname } = useLocation();
+  // Re-checked on every route change, so Insights appears right after Reflect finishes.
+  const links = hasReflectResult() ? NAV_LINKS : NAV_LINKS.filter((link) => link.to !== '/insights');
+  const [open, setOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-30 border-b border-black/5 bg-white/70 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4 lg:px-10">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-indigo-600" />
-            <span className="text-lg font-bold tracking-tight">Aura</span>
-          </Link>
-          <span className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium tracking-wide text-slate-500 md:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            SAFE &amp; CONFIDENTIAL <span className="text-slate-300">•</span> 5 MIN SELF-REFLECTION
-          </span>
-        </div>
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-10">
+        <Link to="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
+          <span className="text-lg font-bold tracking-tight">Mindful Wellbeing</span>
+        </Link>
 
         <nav className="hidden items-center gap-1 rounded-full bg-slate-100/80 p-1 md:flex">
-          {NAV_LINKS.map((link) => {
+          {links.map((link) => {
             const active = pathname === link.to;
             return (
               <Link
@@ -46,16 +51,41 @@ export default function NavBar() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-indigo-400 to-emerald-300 shadow-soft" />
           <button
             type="button"
-            aria-label="Audio"
-            className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-indigo-600"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:text-indigo-600 md:hidden"
           >
-            <AudioLines size={16} />
+            {open ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-indigo-400 to-emerald-300 shadow-soft" />
         </div>
       </div>
+
+      {open && (
+        <nav className="border-t border-black/5 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-6 md:hidden">
+          <div className="flex flex-col gap-1">
+            {links.map((link) => {
+              const active = pathname === link.to;
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setOpen(false)}
+                  className={
+                    'rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ' +
+                    (active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50')
+                  }
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

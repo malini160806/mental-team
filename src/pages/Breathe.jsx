@@ -10,7 +10,7 @@ export default function Breathe() {
         Breathing space, coming soon.
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-slate-500">
-        A guided box-breathing exercise will live here. For now, head back to the Sanctuary or
+        A guided box-breathing exercise will live here. For now, head back to Home or
         continue your reflection.
       </p>
     </div>
