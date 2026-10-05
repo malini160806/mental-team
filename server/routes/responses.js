@@ -26,8 +26,12 @@ router.post('/', async (req, res) => {
     res.status(201).json({
       id: doc._id,
       createdAt: doc.createdAt,
+      completeness: doc.completeness,
+      rawStressScore: doc.rawStressScore,
+      maximumScore: doc.maximumScore,
       stressScore: doc.stressScore,
       stressLevel: doc.stressLevel,
+      features: doc.adjustedFeatures,
       categories: doc.categories,
       modelVersion: doc.modelVersion,
     });
@@ -42,7 +46,7 @@ router.get('/', async (req, res) => {
   res.json(docs);
 });
 
-// Aggregate view for monitoring the score distribution before tuning weights.
+// Aggregate view for monitoring the score distribution before tuning thresholds.
 router.get('/stats', async (_req, res) => {
   const docs = await Response.find().lean();
   const rows = docs.map(datasetRow);
@@ -71,6 +75,8 @@ router.get('/export.csv', async (_req, res) => {
     sessionId: doc.sessionId,
     source: doc.source ?? 'app',
     createdAt: doc.createdAt?.toISOString?.() ?? '',
+    rawStressScore: doc.rawStressScore,
+    maximumScore: doc.maximumScore,
     stressScore: doc.stressScore,
     stressLevel: doc.stressLevel,
     selfReportedStrain: doc.selfReportedStrain,
@@ -82,8 +88,8 @@ router.get('/export.csv', async (_req, res) => {
   res.send(toCsv(rows));
 });
 
-// One row per respondent: behavioural features, category scores, the held-out
-// self-reported strain label and the current model's score — ready for EDA/ML.
+// One row per respondent: behavioural features, category scores, the
+// self-reported strain answer and the current model's score — ready for EDA/ML.
 router.get('/dataset.csv', async (_req, res) => {
   const docs = await Response.find().sort({ createdAt: 1 }).lean();
   res.setHeader('Content-Type', 'text/csv');

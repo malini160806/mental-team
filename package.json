@@ -11,7 +11,8 @@
     "server": "node server/index.js",
     "server:dev": "nodemon server/index.js",
     "dev:all": "concurrently -n web,api -c blue,green \"npm:dev\" \"npm:server:dev\"",
-    "import:sheet": "node server/scripts/importSheet.js"
+    "import:sheet": "node server/scripts/importSheet.js",
+    "verify:scoring": "node server/scripts/verifyScoring.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

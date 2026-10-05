@@ -4,6 +4,8 @@
 // instead of trusting numbers sent by the browser.
 //
 // rows[i] holds the values for option LETTERS[i], in the order of `columns`.
+// `scaleMax` is the top of the question's score range when it is not 0–4
+// (Q1: 0=None … 3=High per the survey doc, Q2: 0–3, Q8: binary 0/1).
 
 export const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 
@@ -12,6 +14,7 @@ export const QUESTION_SPEC = [
     id: 1,
     key: 'life_stage',
     section: 'life',
+    scaleMax: 3,
     columns: ['Life_Stage', 'Academic_Load', 'Work_Load', 'Career_Transition', 'Extra_Responsibility'],
     rows: [
       ['Student', 2, 0, 0, 0],
@@ -25,6 +28,7 @@ export const QUESTION_SPEC = [
     id: 2,
     key: 'independence',
     section: 'life',
+    scaleMax: 3,
     columns: ['Financial_Independence', 'Personal_Responsibility', 'Family_Responsibility'],
     rows: [
       [0, 1, 0],
@@ -104,6 +108,7 @@ export const QUESTION_SPEC = [
     id: 8,
     key: 'sacrifice',
     section: 'body',
+    scaleMax: 1,
     columns: ['Leisure_Sacrifice', 'Social_Sacrifice', 'SelfCare_Sacrifice', 'Sleep_Sacrifice'],
     rows: [
       [0, 0, 0, 0],
@@ -337,6 +342,12 @@ export const QUESTION_SPEC = [
 ];
 
 export const SPEC_BY_ID = Object.fromEntries(QUESTION_SPEC.map((q) => [q.id, q]));
+
+export const DEFAULT_SCALE_MAX = 4;
+
+export function scaleMaxFor(questionId) {
+  return SPEC_BY_ID[questionId]?.scaleMax ?? DEFAULT_SCALE_MAX;
+}
 
 // Values recorded for one answer, e.g. valuesFor(9, 'D') →
 // { Perceived_Workload: 3, Time_Pressure: 4, Overload: 3 }.

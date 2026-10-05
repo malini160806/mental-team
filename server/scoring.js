@@ -35,16 +35,15 @@ export function buildResponseDoc(answers, { sessionId, source = 'app', labels = 
       values: valuesFor(q.id, answers[q.id]),
     })),
     columns: extractColumns(answers),
-    score: Math.round(100 - result.stressScore),
+    score: result.stressScore === null ? undefined : Math.round(100 - result.stressScore),
     lifeStage: result.lifeStage,
     features: result.features,
-    categories: result.categories.map(({ key, label, weight, score, percent }) => ({
-      key,
-      label,
-      weight,
-      score,
-      percent,
-    })),
+    adjustedFeatures: result.adjustedFeatures,
+    categories: result.categories.map(({ key, label, percent }) => ({ key, label, percent })),
+    completeness: result.completeness,
+    missingQuestions: result.missingQuestions,
+    rawStressScore: result.rawStressScore,
+    maximumScore: result.maximumScore,
     stressScore: result.stressScore,
     stressLevel: result.stressLevel,
     selfReportedStrain: result.selfReportedStrain,
@@ -53,7 +52,7 @@ export function buildResponseDoc(answers, { sessionId, source = 'app', labels = 
 }
 
 // Flat ML/EDA row, recomputed from the stored letters with the current model
-// so weight/threshold changes apply to historical data too.
+// so direction/threshold changes apply to historical data too.
 export function datasetRow(doc) {
   const letters = Object.fromEntries((doc.answers ?? []).map((a) => [a.id, a.letter]));
   const result = assess(letters);
@@ -68,6 +67,9 @@ export function datasetRow(doc) {
     row[`cat_${c.key}_pct`] = result.categories.find((r) => r.key === c.key)?.percent ?? '';
   });
   row.self_reported_strain = result.selfReportedStrain ?? '';
+  row.completeness = result.completeness;
+  row.raw_stress_score = result.rawStressScore;
+  row.maximum_score = result.maximumScore;
   row.calculated_stress_score = result.stressScore;
   row.stress_level = result.stressLevel;
   row.model_version = result.modelVersion;

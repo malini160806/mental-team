@@ -4,40 +4,43 @@ import {
   Download,
   Share2,
   ArrowRight,
-  Wind,
-  NotebookPen,
-  Sun,
   AlertTriangle,
   FileText,
   RotateCw,
-  Moon,
   Sparkles,
 } from 'lucide-react';
-import { questions, sections } from '../data/questions';
-import { SECTION_ICON, SECTION_INSIGHT } from '../data/insightContent';
+import { sections } from '../data/questions';
+import { LEVELS } from '../../shared/stressModel.js';
+import { SECTION_INSIGHT } from '../data/insightContent';
+import { SECTION_EMOJI, LEVEL_EMOJI } from '../data/emoji';
+import AnimatedEmoji from '../components/AnimatedEmoji';
 import SectionTag from '../components/SectionTag';
 import { RESULT_KEY } from './Reflect';
 
 const MICRO_STEPS = [
   {
-    icon: Wind,
-    color: 'bg-sky-50 text-sky-600',
+    emoji: 'exhale',
+    color: 'bg-sky-50',
+    bar: 'from-sky-400 to-cyan-400',
+    to: '/breathe',
     title: 'The 4-7-8 Evening Unwind',
     desc: '3 minutes of rhythmic breathing before closing your eyes. Inhale for 4s, hold gently for 7s, exhale completely for 8s.',
     duration: '3 Mins',
     action: 'Try Now',
   },
   {
-    icon: NotebookPen,
-    color: 'bg-indigo-50 text-indigo-600',
+    emoji: 'writing',
+    color: 'bg-violet-50',
+    bar: 'from-indigo-400 to-violet-500',
     title: 'Brain Dump Journaling',
     desc: "Write down tomorrow's 3 tasks before 9 PM to quiet nighttime racing thoughts and transfer cognitive burden to paper.",
     duration: '4 Mins',
     action: 'Open Sheet',
   },
   {
-    icon: Sun,
-    color: 'bg-amber-50 text-amber-600',
+    emoji: 'sun',
+    color: 'bg-amber-50',
+    bar: 'from-amber-400 to-orange-500',
     title: 'A 10-minute Screen-free Stroll',
     desc: 'Natural daylight in the morning to recalibrate your circadian rhythm and provide a sensory boundary between sleep and work.',
     duration: '10 Mins',
@@ -87,10 +90,13 @@ export default function Insights() {
   const { state } = useLocation();
   const result = state?.assessment ? state : loadResult();
   if (!result) return <Navigate to="/reflect" replace />;
-  return <InsightsView answers={result.answers ?? null} assessment={result.assessment} />;
+  return <InsightsView assessment={result.assessment} />;
 }
 
-function InsightsView({ answers, assessment }) {
+// Level bands for the spectrum, e.g. [{ level: 'Low', from: 0, to: 33 }, …].
+const LEVEL_BANDS = LEVELS.map((l, i) => ({ ...l, from: i ? LEVELS[i - 1].max + 1 : 0, to: l.max }));
+
+function InsightsView({ assessment }) {
   const score = Math.round(assessment.stressScore);
   const level = assessment.stressLevel;
   const levelStyle = LEVEL_STYLE[level];
@@ -114,87 +120,84 @@ function InsightsView({ answers, assessment }) {
     return () => cancelAnimationFrame(frame);
   }, [score]);
 
-  const derived = useMemo(() => {
-    if (!answers) {
-      return {
-        themes: [
-          { key: 'focus', tier: 'attention' },
-          { key: 'sleep', tier: 'strength' },
-          { key: 'connection', tier: 'strength' },
-        ],
-      };
-    }
-
-    const bySection = {};
-    Object.keys(sections).forEach((key) => {
-      bySection[key] = { total: 0, count: 0 };
-    });
-    questions.forEach((q) => {
-      const w = answers[q.id];
-      if (w === undefined) return;
-      bySection[q.section].total += w;
-      bySection[q.section].count += 1;
-    });
-
-    const ranked = Object.entries(bySection)
-      .filter(([, v]) => v.count > 0)
-      .map(([key, v]) => ({ key, avg: v.total / v.count }))
-      .sort((a, b) => b.avg - a.avg);
-
-    const themes = [];
+  // Themes follow the model's per-section pressure, so they agree with the score:
+  // the highest-pressure section needs attention, the two lowest are strengths.
+  const themes = useMemo(() => {
+    const ranked = (assessment.categories ?? [])
+      .filter((c) => SECTION_INSIGHT[c.key])
+      .sort((a, b) => b.percent - a.percent);
+    const picked = [];
     if (ranked.length) {
-      themes.push({ key: ranked[0].key, tier: 'attention' });
+      picked.push({ key: ranked[0].key, tier: 'attention' });
       ranked
         .slice(1)
         .reverse()
         .slice(0, 2)
-        .forEach((r) => themes.push({ key: r.key, tier: 'strength' }));
+        .forEach((c) => picked.push({ key: c.key, tier: 'strength' }));
     }
-    while (themes.length < 3) {
-      themes.push({ key: 'sleep', tier: 'strength' });
-    }
+    ['sleep', 'connection', 'focus'].forEach((key) => {
+      if (picked.length < 3 && !picked.some((t) => t.key === key)) picked.push({ key, tier: 'strength' });
+    });
+    return picked;
+  }, [assessment]);
 
-    return { themes };
-  }, [answers]);
+  const isPartial = assessment.completeness === 'partial';
+  const hasBreakdown = Boolean(assessment.adjustedFeatures);
 
   return (
     <div className="relative mx-auto max-w-6xl overflow-hidden px-6 pb-24 pt-12 lg:px-10">
       {/* Decorative ambient blobs */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-24 -top-16 h-72 w-72 animate-float-slow rounded-full bg-teal-200/30 blur-3xl"
+        className="pointer-events-none absolute -left-24 -top-16 h-72 w-72 animate-float-slow rounded-full bg-teal-200/40 blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-16 top-24 h-80 w-80 animate-float-slower rounded-full bg-indigo-200/30 blur-3xl"
+        className="pointer-events-none absolute -right-16 top-24 h-80 w-80 animate-float-slower rounded-full bg-violet-200/40 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-1/3 top-[42rem] h-72 w-72 animate-float-slow rounded-full bg-fuchsia-200/30 blur-3xl"
       />
 
       {/* Header */}
       <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-        <div className="animate-fade-up">
-          <SectionTag icon={Sparkles}>WELLBEING SUMMARY</SectionTag>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            Your Wellbeing Discovery
-          </h1>
-          <p className="mt-2 max-w-lg text-sm text-slate-500">
-            A mindful snapshot synthesized from your contemplative check-in today.
-          </p>
+        <div className="animate-fade-up flex items-start gap-4">
+          <span className="hidden shrink-0 sm:block">
+            <AnimatedEmoji name="hug" size={64} />
+          </span>
+          <div>
+            <SectionTag icon={Sparkles}>WELLBEING SUMMARY</SectionTag>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Your Wellbeing <span className="text-gradient">Discovery</span>
+            </h1>
+            <p className="mt-2 max-w-lg text-sm text-slate-500">
+              Thanks for checking in. Here&apos;s a mindful snapshot of how things feel today.
+            </p>
+          </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-3">
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
+          <button className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <Download size={15} /> Export Report
           </button>
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
+          <button className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <Share2 size={15} /> Share
           </button>
         </div>
       </div>
 
       {/* Score card */}
-      <div className="animate-fade-up relative mt-8 grid gap-8 rounded-[28px] border border-slate-100 bg-white/90 p-6 shadow-card sm:p-8 lg:grid-cols-[280px_1fr]" style={{ animationDelay: '80ms' }}>
+      <div className="animate-fade-up relative mt-8 grid gap-8 overflow-hidden rounded-[28px] bg-white/95 p-6 shadow-soft ring-1 ring-violet-100 sm:p-8 lg:grid-cols-[280px_1fr]" style={{ animationDelay: '80ms' }}>
+        <span aria-hidden className="bar-gradient absolute inset-x-0 top-0 h-1.5" />
         <div className="flex flex-col items-center justify-center gap-3 border-b border-slate-100 pb-8 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
           <div className="relative grid h-44 w-44 place-items-center">
             <div className="animate-pulse-ring absolute inset-0 rounded-full bg-indigo-400/20" />
+            <span
+              className="animate-pop-in absolute -right-3 -top-2 z-10 grid h-14 w-14 place-items-center rounded-full bg-white shadow-card"
+              style={{ animationDelay: '500ms' }}
+            >
+              <AnimatedEmoji name={LEVEL_EMOJI[level]} size={40} label={`${level} stress`} />
+            </span>
             <div
               className="animate-pop-in relative grid h-44 w-44 place-items-center rounded-full transition-[background]"
               style={{
@@ -227,7 +230,40 @@ function InsightsView({ answers, assessment }) {
           </p>
           <p className="mt-1 text-sm text-slate-500">{assessment.explanation}</p>
 
-          <div className="mt-5 rounded-2xl bg-slate-50/80 p-5">
+          {isPartial && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
+              <p className="text-xs leading-relaxed text-slate-600">
+                <span className="font-semibold text-slate-700">Partial result.</span> Based on{' '}
+                {assessment.answeredCount} of {assessment.answeredCount + assessment.missingQuestions.length}{' '}
+                questions — the score is scaled to the questions you answered, not counted as zero.
+              </p>
+            </div>
+          )}
+
+          {hasBreakdown && (
+            <dl className="mt-4 grid grid-cols-3 gap-3">
+              {[
+                { label: 'Raw score', value: assessment.rawStressScore, suffix: `/${assessment.maximumScore}` },
+                { label: 'Behaviours counted', value: assessment.includedFeatureCount },
+                {
+                  label: 'Responses',
+                  value: isPartial ? 'Partial' : 'Complete',
+                  accent: isPartial ? 'text-amber-600' : 'text-emerald-600',
+                },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl bg-slate-50 px-3 py-3 ring-1 ring-slate-100">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{stat.label}</dt>
+                  <dd className={`mt-1 text-lg font-extrabold tabular-nums ${stat.accent ?? 'text-slate-900'}`}>
+                    {stat.value}
+                    {stat.suffix && <span className="text-xs font-semibold text-slate-400">{stat.suffix}</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          <div className="mt-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-amber-50 to-rose-50 p-5">
             <div className="flex items-center justify-between text-sm">
               <p className="font-medium text-slate-600">Stress Level Spectrum</p>
               <span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold shadow-sm ${levelStyle.text}`}>
@@ -241,20 +277,16 @@ function InsightsView({ answers, assessment }) {
               />
             </div>
             <div className="mt-2 flex justify-between text-[11px] font-medium text-slate-400">
-              <span className="text-left">
-                Low
-                <br />0–33
-              </span>
-              <span className="text-center">
-                Moderate
-                <br />
-                34–66
-              </span>
-              <span className="text-right">
-                High
-                <br />
-                67–100
-              </span>
+              {LEVEL_BANDS.map((band, i) => (
+                <span
+                  key={band.level}
+                  className={`${i === 0 ? 'text-left' : i === LEVEL_BANDS.length - 1 ? 'text-right' : 'text-center'} ${band.level === level ? levelStyle.text : ''}`}
+                >
+                  {band.level}
+                  <br />
+                  {band.from}–{band.to}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -294,24 +326,24 @@ function InsightsView({ answers, assessment }) {
         </p>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {derived.themes.map(({ key, tier }, i) => {
-            const Icon = SECTION_ICON[key];
+          {themes.map(({ key, tier }, i) => {
             const content = SECTION_INSIGHT[key][tier];
-            const badgeStyle =
+            const tone =
               tier === 'attention'
-                ? 'bg-amber-50 text-amber-600'
-                : 'bg-emerald-50 text-emerald-600';
+                ? { badge: 'bg-amber-100 text-amber-700', bar: 'from-amber-400 to-orange-500', tile: 'from-amber-50 to-orange-100', link: 'text-orange-600', dot: 'bg-orange-400' }
+                : { badge: 'bg-emerald-100 text-emerald-700', bar: 'from-emerald-400 to-teal-500', tile: 'from-emerald-50 to-teal-100', link: 'text-teal-600', dot: 'bg-teal-400' };
             return (
               <div
                 key={key}
-                className="animate-fade-up group rounded-3xl border border-slate-100 bg-white p-6 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
+                className="animate-fade-up group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-6 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
                 style={{ animationDelay: `${120 + i * 90}ms` }}
               >
+                <span aria-hidden className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${tone.bar}`} />
                 <div className="flex items-center justify-between">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-110">
-                    <Icon size={18} />
+                  <div className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${tone.tile} transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110`}>
+                    <AnimatedEmoji name={SECTION_EMOJI[key]} size={32} />
                   </div>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${badgeStyle}`}>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone.badge}`}>
                     {content.badge}
                   </span>
                 </div>
@@ -319,8 +351,8 @@ function InsightsView({ answers, assessment }) {
                   {sections[key].label}
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-slate-500">{content.desc}</p>
-                <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-indigo-500">
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${tone.link}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
                   Suggested: {content.suggestion}
                 </p>
               </div>
@@ -330,7 +362,7 @@ function InsightsView({ answers, assessment }) {
       </div>
 
       {/* Micro steps */}
-      <div className="animate-fade-up relative mt-16 overflow-hidden rounded-[28px] bg-indigo-50/40 p-8" style={{ animationDelay: '160ms' }}>
+      <div className="animate-fade-up relative mt-16 overflow-hidden rounded-[28px] bg-gradient-to-br from-sky-50 via-violet-50 to-fuchsia-50 p-8 ring-1 ring-violet-100" style={{ animationDelay: '160ms' }}>
         <div
           aria-hidden
           className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 animate-float-slow rounded-full bg-white/50 blur-2xl"
@@ -354,62 +386,46 @@ function InsightsView({ answers, assessment }) {
           {MICRO_STEPS.map((step, i) => (
             <div
               key={step.title}
-              className="animate-fade-up flex flex-col rounded-3xl bg-white p-5 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
+              className="animate-fade-up relative flex flex-col overflow-hidden rounded-3xl bg-white p-5 shadow-card transition hover:-translate-y-1 hover:shadow-soft"
               style={{ animationDelay: `${220 + i * 90}ms` }}
             >
-              <div className={`grid h-10 w-10 place-items-center rounded-xl ${step.color}`}>
-                <step.icon size={18} />
+              <span aria-hidden className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${step.bar}`} />
+              <div className={`grid h-12 w-12 place-items-center rounded-2xl ${step.color}`}>
+                <AnimatedEmoji name={step.emoji} size={32} />
               </div>
               <p className="mt-4 text-sm font-semibold text-slate-800">{step.title}</p>
               <p className="mt-2 flex-1 text-xs leading-relaxed text-slate-500">{step.desc}</p>
               <div className="mt-4 flex items-center justify-between text-xs">
                 <span className="text-slate-400">Duration: {step.duration}</span>
-                <button className="flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-700">
-                  {step.action} <ArrowRight size={13} />
-                </button>
+                {step.to ? (
+                  <Link to={step.to} className="group/link flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-700">
+                    {step.action} <ArrowRight size={13} className="transition-transform group-hover/link:translate-x-0.5" />
+                  </Link>
+                ) : (
+                  <button className="flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-700">
+                    {step.action} <ArrowRight size={13} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="mt-16 grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <div className="animate-fade-up relative flex min-h-[240px] items-end overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_25%_20%,#5a4632,transparent_60%),radial-gradient(circle_at_85%_0%,#3a4a3f,transparent_55%),linear-gradient(160deg,#2a241d,#14110d)] p-7 shadow-card">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-6 top-6 grid h-24 w-24 animate-float-slower place-items-center rounded-full bg-white/10 backdrop-blur-sm"
-          >
-            <Moon size={32} className="text-white/70" />
-          </div>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -left-8 bottom-10 h-16 w-16 animate-float-slow rounded-full bg-emerald-300/20 blur-xl"
-          />
-          <div className="relative text-white">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
-              Atmosphere
-            </p>
-            <p className="mt-2 max-w-xs text-base font-medium leading-snug">
-              Room to exhale without expectation.
-            </p>
-          </div>
-        </div>
-
-        <div className="animate-fade-up flex flex-col justify-center rounded-[28px] border border-slate-100 bg-white p-8 shadow-card" style={{ animationDelay: '80ms' }}>
-          <SectionTag>CONTINUOUS REFLECTION</SectionTag>
-          <h3 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900">
-            Self-inquiry is a practice, not a destination.
-          </h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Every state you inhabit contains value. Today&apos;s score represents a single wave in an
-            ocean of daily transitions. By noticing your patterns early, you have already created
-            space to support yourself.
-          </p>
-          <p className="mt-4 flex items-center gap-2 text-xs font-medium text-indigo-500">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-            Session recorded to your private vault
-          </p>
-        </div>
+      <div className="animate-fade-up mt-16 flex flex-col justify-center rounded-[28px] border border-slate-100 bg-white p-8 shadow-card" style={{ animationDelay: '80ms' }}>
+        <SectionTag>CONTINUOUS REFLECTION</SectionTag>
+        <h3 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900">
+          Self-inquiry is a practice, not a destination.
+        </h3>
+        <p className="mt-3 text-sm leading-relaxed text-slate-500">
+          Every state you inhabit contains value. Today&apos;s score represents a single wave in an
+          ocean of daily transitions. By noticing your patterns early, you have already created
+          space to support yourself.
+        </p>
+        <p className="mt-4 flex items-center gap-2 text-xs font-medium text-indigo-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+          Session recorded to your private vault
+        </p>
       </div>
 
       <div className="animate-fade-up mt-10 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
@@ -427,16 +443,16 @@ function InsightsView({ answers, assessment }) {
 
       <div className="animate-fade-up mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" style={{ animationDelay: '80ms' }}>
         <div className="flex flex-wrap gap-3">
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
+          <button className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <FileText size={15} /> Save Reflection Summary (PDF)
           </button>
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-soft">
+          <button className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <RotateCw size={15} /> Retake in 30 Days
           </button>
         </div>
         <Link
-          to="/reflect"
-          className="flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-indigo-700"
+          to="/breathe"
+          className="btn-gradient flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
         >
           Practice 2-min Box Breathing Now <ArrowRight size={16} />
         </Link>

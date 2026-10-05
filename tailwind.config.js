@@ -18,7 +18,7 @@ export default {
       },
       backgroundImage: {
         'app-gradient':
-          'radial-gradient(1200px 600px at 8% -10%, #d7f7e9 0%, rgba(215,247,233,0) 55%), radial-gradient(1000px 700px at 95% 0%, #e6e3ff 0%, rgba(230,227,255,0) 50%), linear-gradient(180deg, #fbfbff 0%, #f4f3ff 100%)',
+          'radial-gradient(900px 600px at 0% 0%, rgba(153,246,228,0.55) 0%, rgba(153,246,228,0) 60%), radial-gradient(900px 700px at 100% 0%, rgba(221,214,254,0.75) 0%, rgba(221,214,254,0) 55%), radial-gradient(800px 600px at 100% 55%, rgba(251,207,232,0.5) 0%, rgba(251,207,232,0) 60%), radial-gradient(900px 600px at 0% 80%, rgba(186,230,253,0.55) 0%, rgba(186,230,253,0) 60%), radial-gradient(700px 500px at 50% 100%, rgba(254,215,170,0.45) 0%, rgba(254,215,170,0) 60%), linear-gradient(180deg, #fcfbff 0%, #f7f5ff 100%)',
       },
     },
   },
