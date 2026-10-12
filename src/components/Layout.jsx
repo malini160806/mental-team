@@ -4,9 +4,13 @@ import Footer from './Footer';
 export default function Layout({ children }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <NavBar />
+      <div className="print:hidden">
+        <NavBar />
+      </div>
       <main className="flex-1">{children}</main>
-      <Footer />
+      <div className="print:hidden">
+        <Footer />
+      </div>
     </div>
   );
 }

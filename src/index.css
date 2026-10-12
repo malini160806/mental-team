@@ -284,4 +284,8 @@ body {
   .animate-pulse-ring {
     animation: none;
   }
+
+  .breathe-orb {
+    transition: none !important;
+  }
 }

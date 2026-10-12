@@ -13,6 +13,7 @@ const PHASES = [
 ];
 const PHASE_SECONDS = 4;
 const DURATIONS = [1, 2, 5];
+const RING = 2 * Math.PI * 48; // circumference of the progress ring (r = 48)
 
 function formatTime(total) {
   const m = Math.floor(total / 60);
@@ -47,6 +48,9 @@ export default function Breathe() {
   const running = status === 'running';
   const active = running || status === 'paused';
   const circleScale = active ? phase.scale : 0.7;
+  const scaleDuration = running ? PHASE_SECONDS : 0.6;
+  // Fills in quarter steps across each phase; it snaps back at the phase boundary.
+  const phaseProgress = active ? ((elapsed % PHASE_SECONDS) + 1) / PHASE_SECONDS : 0;
 
   return (
     <div className="relative mx-auto max-w-3xl overflow-hidden px-4 pb-24 pt-10 text-center sm:px-6">
@@ -70,7 +74,7 @@ export default function Breathe() {
         </p>
       </div>
 
-      <div className="relative mt-8 overflow-hidden rounded-[32px] bg-white/85 p-6 shadow-soft ring-1 ring-violet-100 backdrop-blur-sm sm:p-10">
+      <div className="relative mt-8 overflow-hidden rounded-[28px] bg-white/90 px-4 py-8 shadow-soft ring-1 ring-violet-100 backdrop-blur-sm sm:rounded-[32px] sm:p-10">
         <span aria-hidden className="bar-gradient absolute inset-x-0 top-0 h-1.5" />
         {done ? (
           <div className="flex flex-col items-center py-10">
@@ -100,53 +104,78 @@ export default function Breathe() {
         ) : (
           <>
             {/* Breathing circle */}
-            <div className="relative mx-auto grid h-64 w-64 place-items-center sm:h-72 sm:w-72">
-              <div
-                className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-300 via-violet-300 to-fuchsia-300 opacity-70 blur-xl"
-                style={{
-                  transform: `scale(${circleScale})`,
-                  transition: `transform ${running ? PHASE_SECONDS : 0.6}s ease-in-out`,
-                }}
-              />
-              <div
-                className="absolute inset-4 rounded-full border-4 border-white/80 bg-gradient-to-br from-teal-50 via-white to-fuchsia-100 shadow-soft"
-                style={{
-                  transform: `scale(${circleScale})`,
-                  transition: `transform ${running ? PHASE_SECONDS : 0.6}s ease-in-out`,
-                }}
-              />
-              <div className="relative flex flex-col items-center">
-                <span key={active ? phaseIndex : 'idle'} className="animate-pop-in">
-                  <AnimatedEmoji name={active ? phase.emoji : 'lotus'} size={56} />
-                </span>
-                <p className="mt-2 text-lg font-bold text-slate-800" aria-live="polite">
-                  {active ? phase.label : 'Ready when you are'}
-                </p>
-                {active && <p className="text-gradient text-3xl font-extrabold tabular-nums">{countdown}</p>}
+            <div className="relative mx-auto aspect-square w-[min(78vw,20rem)]">
+              {/* Phase progress ring */}
+              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
+                <circle cx="50" cy="50" r="48" fill="none" strokeWidth="1.2" className="stroke-violet-100" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="48"
+                  fill="none"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  stroke="url(#breathe-ring)"
+                  strokeDasharray={RING}
+                  strokeDashoffset={RING * (1 - phaseProgress)}
+                  style={{ transition: running && elapsed % PHASE_SECONDS !== 0 ? 'stroke-dashoffset 1s linear' : 'none' }}
+                />
+                <defs>
+                  <linearGradient id="breathe-ring" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#2dd4bf" />
+                    <stop offset="55%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#d946ef" />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              <div className="absolute inset-[7%] grid place-items-center">
+                <div
+                  className="breathe-orb absolute inset-0 rounded-full bg-gradient-to-br from-teal-300 via-violet-300 to-fuchsia-300 opacity-60 blur-2xl"
+                  style={{ transform: `scale(${circleScale})`, transition: `transform ${scaleDuration}s ease-in-out` }}
+                />
+                <div
+                  className="breathe-orb absolute inset-[6%] rounded-full border-[3px] border-white/90 bg-gradient-to-br from-teal-50 via-white to-fuchsia-100 shadow-soft"
+                  style={{ transform: `scale(${circleScale})`, transition: `transform ${scaleDuration}s ease-in-out` }}
+                />
+                <div className="relative flex flex-col items-center px-4">
+                  <span key={active ? phaseIndex : 'idle'} className="animate-pop-in">
+                    <AnimatedEmoji name={active ? phase.emoji : 'lotus'} size={48} />
+                  </span>
+                  <p className="mt-2 text-base font-bold text-slate-800 sm:text-lg" aria-live="polite">
+                    {active ? phase.label : 'Ready when you are'}
+                  </p>
+                  {active && (
+                    <p className="text-gradient text-4xl font-extrabold tabular-nums leading-none sm:text-5xl">{countdown}</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <p className="mt-6 min-h-[1.25rem] text-sm text-slate-500">
+            <p className="mx-auto mt-6 min-h-[2.5rem] max-w-sm text-sm leading-relaxed text-slate-500">
               {active ? phase.hint : 'Find a comfortable seat and relax your shoulders.'}
             </p>
 
             {/* Phase steps */}
-            <div className="mx-auto mt-5 grid max-w-sm grid-cols-4 gap-2">
+            <div className="mx-auto mt-4 grid max-w-md grid-cols-4 gap-1.5 sm:gap-2">
               {PHASES.map((p, i) => (
                 <div
                   key={i}
                   className={
-                    'rounded-full py-1 text-[11px] font-semibold transition-colors ' +
-                    (active && i === phaseIndex ? 'btn-gradient hover:!translate-y-0' : 'bg-violet-50 text-violet-300')
+                    'rounded-xl px-1 py-2 text-[11px] font-semibold leading-tight transition-all duration-300 sm:text-xs ' +
+                    (active && i === phaseIndex
+                      ? 'bg-slate-900 text-white shadow-card'
+                      : 'bg-violet-50/80 text-violet-400')
                   }
                 >
+                  <span className="block text-[10px] font-medium opacity-70">{i + 1}</span>
                   {p.label.replace('Breathe ', '')}
                 </div>
               ))}
             </div>
 
             {/* Controls */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-8 flex flex-col items-center gap-4">
               {status === 'idle' && (
                 <div className="flex rounded-full bg-violet-50 p-1" role="radiogroup" aria-label="Session length">
                   {DURATIONS.map((d) => (
@@ -157,7 +186,7 @@ export default function Breathe() {
                       aria-checked={minutes === d}
                       onClick={() => setMinutes(d)}
                       className={
-                        'rounded-full px-4 py-1.5 text-sm font-medium transition ' +
+                        'rounded-full px-5 py-2 text-sm font-medium transition ' +
                         (minutes === d ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-800')
                       }
                     >
@@ -167,24 +196,26 @@ export default function Breathe() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => setStatus(running ? 'paused' : 'running')}
-                className="btn-gradient flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
-              >
-                {running ? <Pause size={16} /> : <Play size={16} />}
-                {running ? 'Pause' : status === 'paused' ? 'Resume' : 'Start'}
-              </button>
-
-              {active && (
+              <div className="flex w-full max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
                 <button
                   type="button"
-                  onClick={reset}
-                  className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  onClick={() => setStatus(running ? 'paused' : 'running')}
+                  className="btn-gradient flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold"
                 >
-                  <RotateCcw size={15} /> Reset
+                  {running ? <Pause size={16} /> : <Play size={16} />}
+                  {running ? 'Pause' : status === 'paused' ? 'Resume' : 'Start'}
                 </button>
-              )}
+
+                {active && (
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <RotateCcw size={15} /> Reset
+                  </button>
+                )}
+              </div>
             </div>
 
             {active && (
