@@ -16,7 +16,8 @@ import { SECTION_EMOJI, LEVEL_EMOJI } from '../data/emoji';
 import AnimatedEmoji from '../components/AnimatedEmoji';
 import SectionTag from '../components/SectionTag';
 import { RESULT_KEY } from './Reflect';
-import { buildReportText, downloadTextFile, shareText } from '../lib/report';
+import { buildReportText, shareText } from '../lib/report';
+import { downloadPdfReport, saveBlob } from '../lib/pdfReport';
 
 const MICRO_STEPS = [
   {
@@ -149,18 +150,49 @@ function InsightsView({ assessment }) {
     return () => clearTimeout(t);
   }, [notice]);
 
-  const handleExport = () => {
-    downloadTextFile('wellbeing-report.txt', buildReportText(assessment));
-    setNotice('Report downloaded');
+  const [busy, setBusy] = useState(false);
+
+  const makePdf = () =>
+    downloadPdfReport({
+      assessment,
+      themes,
+      insightContent: SECTION_INSIGHT,
+      sectionLabels: Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.label])),
+    });
+
+  const handleExport = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { blob, filename } = await makePdf();
+      saveBlob(blob, filename);
+      setNotice('PDF report downloaded');
+    } catch {
+      setNotice('Could not create the PDF. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleShare = async () => {
     try {
+      // Prefer sharing the PDF itself where the device supports file sharing.
+      const { blob, filename } = await makePdf();
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'My wellbeing report' });
+          setNotice('Shared');
+        } catch (err) {
+          if (err?.name !== 'AbortError') throw err;
+        }
+        return;
+      }
       const result = await shareText('My wellbeing summary', buildReportText(assessment));
       if (result === 'copied') setNotice('Summary copied to clipboard');
       else if (result === 'shared') setNotice('Shared');
     } catch (err) {
-      setNotice(err.message);
+      setNotice(err.message || 'Sharing failed');
     }
   };
 
@@ -201,7 +233,7 @@ function InsightsView({ assessment }) {
         </div>
         <div className="flex shrink-0 flex-wrap gap-3 print:hidden">
           <button type="button" onClick={handleExport} className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
-            <Download size={15} /> Export Report
+            <Download size={15} /> {busy ? 'Preparing…' : 'Export PDF'}
           </button>
           <button type="button" onClick={handleShare} className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <Share2 size={15} /> Share
@@ -475,8 +507,8 @@ function InsightsView({ assessment }) {
 
       <div className="animate-fade-up mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden" style={{ animationDelay: '80ms' }}>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={() => window.print()} className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
-            <FileText size={15} /> Save Reflection Summary (PDF)
+          <button type="button" onClick={handleExport} className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
+            <FileText size={15} /> Download Report (PDF)
           </button>
           <button type="button" onClick={() => setNotice('Reminder: retake the check-in in 30 days')} className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:text-violet-700 hover:shadow-soft">
             <RotateCw size={15} /> Retake in 30 Days

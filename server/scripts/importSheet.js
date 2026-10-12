@@ -9,7 +9,7 @@
 // or start with its letter ("A", "A.", "A) ...").
 // Re-running on the same file is safe: rows already imported are skipped.
 
-import 'dotenv/config';
+import '../loadEnv.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import mongoose from 'mongoose';
